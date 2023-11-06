@@ -333,39 +333,6 @@ def calc_fidelity6(u, nsegments, rfi, ssx, ssy, Ut, delT, nions, amp_max):
     print(infid)
     # print(infid1)
     return infid
-
-def calc_fidelity6_ct(u, nsegments, rfi, ssx, ssy, Ut, delT, nions, amp_max):
-    
-    ux = u[0:nsegments] * amp_max / np.sqrt(2)
-    uy = u[nsegments:] * amp_max / np.sqrt(2)
-    Uf = (np.zeros((len(rfi),nsegments,2**nions,2**nions), dtype=complex))
-    
-    w0 = 19/20
-    w1 = 1/20
-    
-    for rfindex in range(len(rfi)):
-        for segment in range(nsegments):
-            if segment == 0:
-                Uf[rfindex][segment] = expm(-1.0j * delT * rfi[rfindex] * (ux[segment] * (ssx / 2) 
-                                                                          +  uy[segment] * (ssy / 2)))
-            else:
-                Uf[rfindex][segment] = np.matmul(expm(-1.0j * delT * rfi[rfindex] * (ux[segment] * (ssx / 2) 
-                                                                                    +  uy[segment] * (ssy / 2))),
-                                                                                       Uf[rfindex][segment-1])
-    Fid = 0
-    for rfindex in range(len(rfi)):
-        if rfi[rfindex] < 1/4:
-            Fid += w0 * abs(np.trace(np.matmul(np.eye(2),Uf[rfindex][-1]))) / 2**nions / (len(rfi)-1)
-        else:
-            Fid += w1 * abs(np.trace(np.matmul(dagger(Ut),Uf[rfindex][-1]))) / 2**nions
-    
-
-    
-    # infid = (1-Fid/len(rfi))*1e4
-    infid = (1-Fid)*1e4
-    # print(infid)
-    return infid
-
     
     
 def calc_fidelity7(x, nsegments, rfi, ssx, ssy, Ut, delT, nions, amp_max):
@@ -468,23 +435,7 @@ def calc_fidelity_t(u, nsegments, rfi, ssx, ssy, Ut, nions, amp_max):
     return infid
 
 
-def calc_uf(u, nsegments, rfi, ssx,ssy, delT,nions, amp_max):
-    
-    ux = u[0:nsegments] * amp_max / np.sqrt(2)
-    uy = u[nsegments:] * amp_max / np.sqrt(2)
-    Uf = (np.zeros((len(rfi),nsegments,2**nions,2**nions), dtype=complex))
-    
-    for rfindex in range(len(rfi)):
-        for segment in range(nsegments):
-            if segment == 0:
-                Uf[rfindex][segment] = expm(-1.0j * delT * rfi[rfindex] * (ux[segment] * (ssx / 2) 
-                                                                          +  uy[segment] * (ssy / 2)))
-            else:
-                Uf[rfindex][segment] = np.matmul(expm(-1.0j * delT * rfi[rfindex] * (ux[segment] * (ssx / 2) 
-                                                                                    +  uy[segment] * (ssy / 2))),
-                                                                                       Uf[rfindex][segment-1])
-                
-    return Uf
+
 
 def eval_grad(x, z, a):
     return  -2 * np.real(np.trace(x) * z) / 2**(2 * a)
@@ -508,6 +459,24 @@ def calc_grad(Uf, nions, rfi,nsegments,Ut,gr_penal,penalty_weight,ssx,delT):
 
     return  Grad
 
+def calc_uf(u, nsegments, rfi, ssx,ssy, delT,nions, amp_max):
+    
+    ux = u[0:nsegments] * amp_max / np.sqrt(2)
+    uy = u[nsegments:] * amp_max / np.sqrt(2)
+    Uf = (np.zeros((len(rfi),nsegments,2**nions,2**nions), dtype=complex))
+    
+    for rfindex in range(len(rfi)):
+        for segment in range(nsegments):
+            if segment == 0:
+                Uf[rfindex][segment] = expm(-1.0j * delT * rfi[rfindex] * (ux[segment] * (ssx / 2) 
+                                                                          +  uy[segment] * (ssy / 2)))
+            else:
+                Uf[rfindex][segment] = np.matmul(expm(-1.0j * delT * rfi[rfindex] * (ux[segment] * (ssx / 2) 
+                                                                                    +  uy[segment] * (ssy / 2))),
+                                                                                       Uf[rfindex][segment-1])
+                
+    return Uf
+
 def calc_grad2(u, nsegments, rfi, ssx, ssy, Ut, delT, nions, amp_max):
     # Backward propagator
     Uf = calc_uf(u, nsegments, rfi, ssx, ssy, delT, nions, amp_max)
@@ -517,8 +486,8 @@ def calc_grad2(u, nsegments, rfi, ssx, ssy, Ut, delT, nions, amp_max):
         for segment in range(nsegments):
             Ub[rfindex][segment] = np.matmul(Uf[rfindex][-1], dagger(Uf[rfindex][segment])) 
     
-    w0 = 19/20
-    w1 = 1/20
+    w0 = 1
+    w1 = 1
     
     grad1 = np.zeros(nsegments)
     grad2 = np.zeros(nsegments)
@@ -529,9 +498,9 @@ def calc_grad2(u, nsegments, rfi, ssx, ssy, Ut, delT, nions, amp_max):
             for segment in range(nsegments):
                 XX = np.matmul(Uf[rfindex][segment],dagger(np.eye(2)))
                 grad1[segment] += w0 * eval_grad(prod(Ub[rfindex][segment],ssx/2,XX),
-                                                                1.0j * delT * trxjpj, nions) / (len(rfi)-1)
+                                                                1.0j * delT * trxjpj, nions)
                 grad2[segment] += w0 * eval_grad(prod(Ub[rfindex][segment],ssy/2,XX),
-                                                                1.0j * delT * trxjpj, nions) / (len(rfi)-1)
+                                                                1.0j * delT * trxjpj, nions)
         else:
             trxjpj = np.trace(np.matmul(dagger(Uf[rfindex][-1]),Ut))
             for segment in range(nsegments):
@@ -544,6 +513,35 @@ def calc_grad2(u, nsegments, rfi, ssx, ssy, Ut, delT, nions, amp_max):
     grad = np.append(grad1,grad2) / len(rfi)
     return (-grad)*1e4
 
+def calc_fidelity6_ct(u, nsegments, rfi, ssx, ssy, Ut, delT, nions, amp_max):
+    
+    ux = u[0:nsegments] * amp_max / np.sqrt(2)
+    uy = u[nsegments:] * amp_max / np.sqrt(2)
+    Uf = (np.zeros((len(rfi),nsegments,2**nions,2**nions), dtype=complex))
+    
+    w0 = 1
+    w1 = 1
+    
+    for rfindex in range(len(rfi)):
+        for segment in range(nsegments):
+            if segment == 0:
+                Uf[rfindex][segment] = expm(-1.0j * delT * rfi[rfindex] * (ux[segment] * (ssx / 2) 
+                                                                          +  uy[segment] * (ssy / 2)))
+            else:
+                Uf[rfindex][segment] = np.matmul(expm(-1.0j * delT * rfi[rfindex] * (ux[segment] * (ssx / 2) 
+                                                                                    +  uy[segment] * (ssy / 2))),
+                                                                                       Uf[rfindex][segment-1])
+    Fid = 0
+    for rfindex in range(len(rfi)):
+        if rfi[rfindex] < 1/4:
+            Fid += w0 * abs(np.trace(np.matmul(np.eye(2),Uf[rfindex][-1]))) / 2**nions 
+        else:
+            Fid += w1 * abs(np.trace(np.matmul(dagger(Ut),Uf[rfindex][-1]))) / 2**nions
+    
+    infid = (1-Fid/len(rfi))*1e4
+    # infid = (1-Fid)*1e4
+    # print(infid)
+    return infid
 
 def conjugate_grad(resetflag, iter, Grad, oldGrad, oldDirc, FidCurrent, stepsize, nions, nsegments, rfi, ssz, W1, W2, Ut, u, delT, penalty_weight, PenaltyRange):
     if iter != 1 and not resetflag:
